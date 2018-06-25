@@ -1,32 +1,54 @@
-import signal
-import sys
+import networkx as nx
+import matplotlib.pyplot as plt
 
-N_Par = 12
-
-
-def signal_handler(signal, frame):
-    print('Max is: ', str(max_time), 'Min is: ', str(min_time))
-    sys.exit(0)
+N = 12
 
 
-signal.signal(signal.SIGINT, signal_handler)
-with open('sx-stackoverflow.txt') as f:
-    line = f.readline()
-    max_time = int(line.split(' ')[2].replace('/n', ''))
-    min_time = int(line.split(' ')[2].replace('/n', ''))
-    for line in f:
-        line = int(line.split(' ')[2].replace('/n', ''))
-        if line > max_time:
-            max_time = line
-        elif line < min_time:
-            min_time = line
-print('Max is: ', str(max_time), '\nMin is: ', str(min_time))
+def min_max():
+    try:
+        f = open('min_max.txt')
+        f = f.read().split(',')
+        max = int(f[0])
+        min = int(f[1])
+    except FileNotFoundError:
+        with open('sx-stackoverflow.txt') as f:
+            line = f.readline()
+            max = int(line.split(' ')[2].replace('/n', ''))
+            min = int(line.split(' ')[2].replace('/n', ''))
+            for line in f:
+                line = line.split(' ')
+                line[2] = int(line[2].replace('/n', ''))
+                if line[2] > max:
+                    max = line[2]
+                elif line[2] < min:
+                    min = line[2]
+        print('Max is: ', str(max),
+              '\nMin is: ', str(min))
+        f = open('min_max.txt', 'w')
+        f.write(str(max) + ',' + str(min))
+    return max, min
 
+
+def graph(t):
+    G = nx.DiGraph()
+    with open('sx-stackoverflow.txt') as f:
+        for line in f:
+            if int(line.split(' ')[2].replace('\n', '')) < qN[t][1]:
+                G.add_node(line[0])
+                G.add_edge(line[0], line[1])
+    nx.draw(G)
+    plt.show()
+
+
+max_time, min_time = min_max()
 dt = max_time - min_time
 tN = []
 qN = []
-dT = dt / N_Par
-for j in range(N_Par):
+dT = dt / N
+for j in range(N):
     tN.append(int(min_time + j * dT))
 for j in range(len(tN) - 1):
     qN.append([tN[j], tN[j+1]])
+
+for i in range(N - 1):
+    graph(i)
