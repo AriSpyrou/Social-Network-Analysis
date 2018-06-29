@@ -1,10 +1,18 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 import collections as col
+from numpy import zeros, argmax
 
-N_RL = 500
+N_RL = 100
 
-N = 6
+N = 1
+PGD = 5
+PCN = 5
+PJC = 5
+PA = 5
+PPA = 5
+
+parameter_list = [PGD, PCN, PJC, PA, PPA]
 
 
 def min_max():
@@ -39,8 +47,9 @@ def graph(t, centrality='degree'):
             line = f.readline().split(' ')
             line[2] = int(line[2].replace('\n', ''))
             if line[2] < qN[t][1] or (t == N - 1 and line[2] <= qN[t][1]):
-                g.add_node(line[0])
-                g.add_edge(line[0], line[1])
+                if line[0] != line[1]:
+                    g.add_node(line[0])
+                    g.add_edge(line[0], line[1])
     nx.draw_networkx(g, node_size=150, font_size=10)
     plt.show()
     centrality_histogram(g, centrality)
@@ -79,11 +88,13 @@ def graph_star(t):
                 line = f.readline().split(' ')
                 line[2] = int(line[2].replace('\n', ''))
                 if line[2] < qN[t][1]:
-                    g1.add_node(line[0])
-                    g1.add_edge(line[0], line[1])
+                    if line[0] != line[1]:
+                        g1.add_node(line[0])
+                        g1.add_edge(line[0], line[1])
                 elif line[2] < qN[t + 1][1]:
-                    g2.add_node(line[0])
-                    g2.add_edge(line[0], line[1])
+                    if line[0] != line[1]:
+                        g2.add_node(line[0])
+                        g2.add_edge(line[0], line[1])
         v_star = []
         e1_star = []
         e2_star = []
@@ -117,6 +128,68 @@ def graph_star(t):
         print('V*[t_', t, ',', 't_', t+2, '} = ', v_star)
         print('E*[t_', t, ',', 't_', t+1, '] =', e1_star)
         print('E*[t_', t+1, ',', 't_', t+2, '] =', e2_star)
+        similarity_matrices(e1_star)
+
+
+def similarity_matrices(edges):
+    g = nx.DiGraph()
+    g.add_edges_from(edges)
+    ung = nx.Graph(g)
+
+    gd = zeros((g.number_of_nodes(), g.number_of_nodes()))
+    cn = zeros((g.number_of_nodes(), g.number_of_nodes()))
+    jc = zeros((g.number_of_nodes(), g.number_of_nodes()))
+    a = zeros((g.number_of_nodes(), g.number_of_nodes()))
+    pa = zeros((g.number_of_nodes(), g.number_of_nodes()))
+    nodes = list(g.nodes)
+    for i in range(len(nodes)):
+        for j in range(len(nodes)):
+            try:
+                gd[i][j] = nx.shortest_path_length(g, nodes[i], nodes[j])
+            except nx.NetworkXNoPath:
+                gd[i][j] = -1
+                pass
+            cn[i][j] = len(sorted(nx.common_neighbors(ung, nodes[i], nodes[j])))
+            for u, v, p in nx.jaccard_coefficient(ung, [(nodes[i], nodes[j])]):
+                jc[i][j] = p
+            try:
+                for u, v, p in nx.adamic_adar_index(ung, [(nodes[i], nodes[j])]):
+                    a[i][j] = p
+            except ZeroDivisionError:
+                pass
+            for u, v, p in nx.preferential_attachment(ung, [(nodes[i], nodes[j])]):
+                pa[i][j] = p
+    ####
+    k = 0
+    for par in parameter_list:
+        ind_list = []
+        if k == 0:
+            ref = gd
+            t = 'Pgd'
+        elif k == 1:
+            ref = cn
+            t = 'Pcn'
+        elif k == 2:
+            ref = jc
+            t = 'Pjc'
+        elif k == 3:
+            ref = a
+            t = 'Pa'
+        else:
+            ref = pa
+            t = 'Ppa'
+
+        for i in range(par):
+            flat_ind = argmax(ref)
+            dim_ind = tuple((flat_ind // len(nodes), flat_ind % len(nodes)))
+            ref[dim_ind[0]][dim_ind[1]] = -1
+            ind_list.append(dim_ind)
+        cnt = 0
+        for j in ind_list:
+            if tuple((nodes[j[0]], nodes[j[1]])) in edges:
+                cnt += 1
+        k += 1
+        print(t, cnt/par)
 
 
 max_time, min_time = min_max()
@@ -131,5 +204,5 @@ for j in range(len(tN) - 1):
 del tN
 
 for i in range(N):
-    #graph(i, centrality='closeness')
+    graph(i, centrality='katz')
     graph_star(i)
