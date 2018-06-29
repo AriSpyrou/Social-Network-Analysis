@@ -3,9 +3,9 @@ import matplotlib.pyplot as plt
 import collections as col
 from numpy import zeros, argmax
 
-N_RL = 100
+N_RL = 100  # How many lines the program reads from the file
 
-N = 1
+N = 1  # Number of time frames
 PGD = 5
 PCN = 5
 PJC = 5
@@ -15,7 +15,7 @@ PPA = 5
 parameter_list = [PGD, PCN, PJC, PA, PPA]
 
 
-def min_max():
+def min_max():  # Calculates the minimum and the maximum timestamp
     try:
         f = open('min_max' + str(N_RL) + '.txt')
         f = f.read().split(',')
@@ -40,7 +40,7 @@ def min_max():
     return max, min
 
 
-def graph(t, centrality='degree'):
+def graph(t, centrality='degree'):  # Creates a graph
     g = nx.DiGraph()
     with open('sx-stackoverflow.txt') as f:
         for j in range(N_RL):
@@ -55,7 +55,7 @@ def graph(t, centrality='degree'):
     centrality_histogram(g, centrality)
 
 
-def centrality_histogram(g, c):
+def centrality_histogram(g, c):  # Creates the centrality histogram specified
     if c == 'degree':
         degree_sequence = sorted([val for key, val in nx.degree_centrality(g).items()])
     elif c == 'in_degree':
@@ -79,7 +79,7 @@ def centrality_histogram(g, c):
     plt.show()
 
 
-def graph_star(t):
+def graph_star(t):  # Finds V* and E*
     if t < N - 1:
         g1 = nx.DiGraph()
         g2 = nx.DiGraph()
@@ -131,7 +131,7 @@ def graph_star(t):
         similarity_matrices(e1_star)
 
 
-def similarity_matrices(edges):
+def similarity_matrices(edges):  # Calculates the similarity matrices
     g = nx.DiGraph()
     g.add_edges_from(edges)
     ung = nx.Graph(g)
