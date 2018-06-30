@@ -3,9 +3,9 @@ import matplotlib.pyplot as plt
 import collections as col
 from numpy import zeros, argmax
 
-N_RL = 100  # How many lines the program reads from the file
+N_RL = 1000  # How many lines the program reads from the file
 
-N = 1  # Number of time frames
+N = 5  # Number of time frames
 PGD = 5
 PCN = 5
 PJC = 5
@@ -46,10 +46,9 @@ def graph(t, centrality='degree'):  # Creates a graph
         for j in range(N_RL):
             line = f.readline().split(' ')
             line[2] = int(line[2].replace('\n', ''))
-            if line[2] < qN[t][1] or (t == N - 1 and line[2] <= qN[t][1]):
-                if line[0] != line[1]:
-                    g.add_node(line[0])
-                    g.add_edge(line[0], line[1])
+            if qN[t][0] <= line[2] < qN[t][1] or (t == N - 1 and qN[t][0] <= line[2] <= qN[t][1]) \
+                    and line[0] != line[1]:
+                g.add_edge(line[0], line[1])
     nx.draw_networkx(g, node_size=150, font_size=10)
     plt.show()
     centrality_histogram(g, centrality)
@@ -87,13 +86,11 @@ def graph_star(t):  # Finds V* and E*
             for j in range(N_RL):
                 line = f.readline().split(' ')
                 line[2] = int(line[2].replace('\n', ''))
-                if line[2] < qN[t][1]:
+                if qN[t][0] <= line[2] < qN[t][1]:
                     if line[0] != line[1]:
-                        g1.add_node(line[0])
                         g1.add_edge(line[0], line[1])
-                elif line[2] < qN[t + 1][1]:
+                elif qN[t + 1][0] <= line[2] < qN[t + 1][1]:
                     if line[0] != line[1]:
-                        g2.add_node(line[0])
                         g2.add_edge(line[0], line[1])
         v_star = []
         e1_star = []
@@ -125,23 +122,26 @@ def graph_star(t):  # Finds V* and E*
             if found1 and found2:
                 e2_star.append(i)
         print('t =', t)
-        print('V*[t_', t, ',', 't_', t+2, '} = ', v_star)
-        print('E*[t_', t, ',', 't_', t+1, '] =', e1_star)
-        print('E*[t_', t+1, ',', 't_', t+2, '] =', e2_star)
-        similarity_matrices(e1_star)
+        print('V*[t_', t, ',', 't_', t + 2, '} = ', v_star)
+        print('E*[t_', t, ',', 't_', t + 1, '] =', e1_star)
+        print('E*[t_', t + 1, ',', 't_', t + 2, '] =', e2_star)
+        if similarity_matrices(e1_star, v_star) == -1:
+            return -1
 
 
-def similarity_matrices(edges):  # Calculates the similarity matrices
+def similarity_matrices(edges, nodes):  # Calculates the similarity matrices
+    if len(nodes) == 0:
+        print('V* is empty, skipping to next t.')
+        return -1
     g = nx.DiGraph()
     g.add_edges_from(edges)
     ung = nx.Graph(g)
 
-    gd = zeros((g.number_of_nodes(), g.number_of_nodes()))
-    cn = zeros((g.number_of_nodes(), g.number_of_nodes()))
-    jc = zeros((g.number_of_nodes(), g.number_of_nodes()))
-    a = zeros((g.number_of_nodes(), g.number_of_nodes()))
-    pa = zeros((g.number_of_nodes(), g.number_of_nodes()))
-    nodes = list(g.nodes)
+    gd = zeros((len(nodes), len(nodes)))
+    cn = zeros((len(nodes), len(nodes)))
+    jc = zeros((len(nodes), len(nodes)))
+    a = zeros((len(nodes), len(nodes)))
+    pa = zeros((len(nodes), len(nodes)))
     for i in range(len(nodes)):
         for j in range(len(nodes)):
             try:
@@ -149,16 +149,35 @@ def similarity_matrices(edges):  # Calculates the similarity matrices
             except nx.NetworkXNoPath:
                 gd[i][j] = -1
                 pass
-            cn[i][j] = len(sorted(nx.common_neighbors(ung, nodes[i], nodes[j])))
-            for u, v, p in nx.jaccard_coefficient(ung, [(nodes[i], nodes[j])]):
-                jc[i][j] = p
+            except nx.NodeNotFound:
+                gd[i][j] = -1
+                pass
+            try:
+                cn[i][j] = len(sorted(nx.common_neighbors(ung, nodes[i], nodes[j])))
+            except nx.NetworkXError:
+                cn[i][j] = -1
+                pass
+            try:
+                for u, v, p in nx.jaccard_coefficient(ung, [(nodes[i], nodes[j])]):
+                    jc[i][j] = p
+            except:
+                jc[i][j] = -1
+                pass
             try:
                 for u, v, p in nx.adamic_adar_index(ung, [(nodes[i], nodes[j])]):
                     a[i][j] = p
             except ZeroDivisionError:
+                a[i][j] = -1
                 pass
-            for u, v, p in nx.preferential_attachment(ung, [(nodes[i], nodes[j])]):
-                pa[i][j] = p
+            except nx.NetworkXError:
+                a[i][j] = -1
+                pass
+            try:
+                for u, v, p in nx.preferential_attachment(ung, [(nodes[i], nodes[j])]):
+                    pa[i][j] = p
+            except:
+                pa[i][j] = -1
+                pass
     ####
     k = 0
     for par in parameter_list:
@@ -186,10 +205,10 @@ def similarity_matrices(edges):  # Calculates the similarity matrices
             ind_list.append(dim_ind)
         cnt = 0
         for j in ind_list:
-            if tuple((nodes[j[0]], nodes[j[1]])) in edges:
+            if tuple((nodes[j[0]], nodes[j[1]])) in edges or tuple((nodes[j[1]], nodes[j[0]])) in edges:
                 cnt += 1
         k += 1
-        print(t, cnt/par)
+        print(t, cnt / par)
 
 
 max_time, min_time = min_max()
@@ -200,9 +219,10 @@ dT = dt / N
 for j in range(N + 1):
     tN.append(int(min_time + j * dT))
 for j in range(len(tN) - 1):
-    qN.append([tN[j], tN[j+1]])
+    qN.append([tN[j], tN[j + 1]])
 del tN
 
 for i in range(N):
-    graph(i, centrality='katz')
-    graph_star(i)
+    graph(i, centrality='degree')
+    if graph_star(i) == -1:
+        continue
